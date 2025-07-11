@@ -1,2 +1,63 @@
 name: MLOps CI/CD Training Pipelines
 
+on:
+  push:
+    branches:
+      - training_pipelines
+
+jobs:
+  build_train_deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_VERTEX_BUCKET: ${{ vars.GCP_VERTEX_BUCKET }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      TRAINING_JOB_SERVICE_ACCOUNT: ${{ vars.TRAINING_JOB_SERVICE_ACCOUNT }}
+
+    outputs:
+      MODEL_ID: ${{ steps.model_upload.outputs.MODEL_ID }}
+
+      
+    steps:
+      - uses: 'actions/checkout@v4'
+        with:
+          fetch-depth: 0
+
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v2"
+        with:
+          token_format: "access_token"
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Set up Python
+        uses: 'actions/setup-python@v5'
+        with:
+          python-version: '3.10'
+
+      - name: Install Python Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Execute Pipeline Definition Script
+        run: python pipeline_definition.py
+        env:
+          PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
+          REGION: ${{ env.GCP_REGION }}
+          GCP_VERTEX_BUCKET: ${{ env.GCP_VERTEX_BUCKET }}
+          GCP_ARTIFACT_REGISTRY_REPO: ${{ env.GCP_ARTIFACT_REGISTRY_REPO }}
+          TRAINING_IMAGE_URI: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REGISTRY_REPO }}/house-price-trainer:latest
+          GCS_DATA_PATH: gs://${{ env.GCP_VERTEX_BUCKET }}/data/housing.csv
+          GCS_MODEL_OUTPUT_DIR: gs://${{ env.GCP_VERTEX_BUCKET }}/models/house-price-model
+          TRAINING_JOB_SERVICE_ACCOUNT: ${{ env.GCP_PROJECT_ID }}-compute@developer.gserviceaccount.com

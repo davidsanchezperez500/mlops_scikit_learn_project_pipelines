@@ -33,7 +33,9 @@ Un pipeline de entrenamiento es una secuencia de pasos automatizados que incluye
 - Python 3.7+
 - Instalar dependencias:
   ```bash
-  pip install -r requirements.txt
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
   ```
 
 ## Recursos útiles
